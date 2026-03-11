@@ -9,6 +9,7 @@ const PIN_LENGTH = 6;
 export default function PinPage() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
   const login = useAuthStore((s) => s.login);
 
   const handleKey = (val: string) => {
@@ -32,6 +33,7 @@ export default function PinPage() {
     } catch (err: any) {
       toast.error(err?.message ?? "Noto'g'ri PIN kod");
       setPin("");
+      setShake(true);
     } finally {
       setLoading(false);
     }
@@ -44,7 +46,7 @@ export default function PinPage() {
   const keys = ["1","2","3","4","5","6","7","8","9","tozalash","0","del"];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-7 px-8">
+    <div className="h-full bg-background flex flex-col items-center justify-center gap-7 px-8 pt-16">
       {/* Icon */}
       <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center">
         <Lock size={36} className="text-primary" strokeWidth={1.8} />
@@ -57,7 +59,10 @@ export default function PinPage() {
       </div>
 
       {/* Dots */}
-      <div className="flex gap-4">
+      <div
+        className={`flex gap-4 ${shake ? "animate-shake" : ""}`}
+        onAnimationEnd={() => setShake(false)}
+      >
         {Array.from({ length: PIN_LENGTH }).map((_, i) => (
           <div
             key={i}
@@ -77,6 +82,7 @@ export default function PinPage() {
             return (
               <button
                 key="tozalash"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleClearAll}
                 disabled={pin.length === 0 || loading}
                 className="h-16 rounded-2xl bg-white shadow-sm border border-border text-muted-foreground flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
@@ -88,6 +94,7 @@ export default function PinPage() {
             return (
               <button
                 key="del"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleDeleteLast}
                 disabled={pin.length === 0 || loading}
                 className="h-16 rounded-2xl bg-white shadow-sm border border-border text-muted-foreground flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
@@ -98,6 +105,7 @@ export default function PinPage() {
           return (
             <button
               key={i}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKey(k)}
               disabled={loading}
               className="h-16 rounded-2xl bg-white shadow-sm border border-border text-xl font-semibold text-foreground active:scale-95 transition-transform hover:bg-muted/50"

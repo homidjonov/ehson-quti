@@ -370,7 +370,7 @@ function BoxCard({ box, onClick }: { box: Box; onClick: () => void }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-foreground">Exson qutisi {box.number}</p>
-        <p className="text-sm text-muted-foreground">{box.location[0]}, {box.location[1]}</p>
+        <p className="text-sm text-muted-foreground">{new Date(box.created_at * 1000).toLocaleDateString("ru-RU")}</p>
       </div>
       <span className={`text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0 ${
         box.is_empty
