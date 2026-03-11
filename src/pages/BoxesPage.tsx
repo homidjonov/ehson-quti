@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchBoxes, setBoxEmpty, createBox, uploadImage } from "../api/client";
+import { fetchBoxes, setBoxEmpty, removeBox, createBox, uploadImage } from "../api/client";
 import { BoxesMap, SingleBoxMap, LocationPickerMap } from "../components/MapView";
 import { BottomSheet } from "../components/BottomSheet";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -21,6 +21,8 @@ export default function BoxesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [settingEmpty, setSettingEmpty] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Add box form state
   const [addNumber, setAddNumber] = useState("");
@@ -47,6 +49,22 @@ export default function BoxesPage() {
   const handleSelectBox = (box: Box) => {
     resetTimer();
     setSelectedBox(box);
+  };
+
+  const handleDeleteBox = async () => {
+    if (!selectedBox) return;
+    setDeleting(true);
+    try {
+      await removeBox(selectedBox.id);
+      toast.success("Quti o'chirildi");
+      queryClient.invalidateQueries({ queryKey: ["boxes"] });
+      setConfirmDelete(false);
+      setSelectedBox(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "O'chirishda xato");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleSetEmpty = async () => {
@@ -220,6 +238,7 @@ export default function BoxesPage() {
             box={selectedBox}
             onClose={() => setSelectedBox(null)}
             onSetEmpty={() => setConfirmEmpty(true)}
+            onLongPressIcon={() => setConfirmDelete(true)}
           />
         )}
       </BottomSheet>
@@ -325,6 +344,17 @@ export default function BoxesPage() {
         onCancel={() => setConfirmEmpty(false)}
         loading={settingEmpty}
       />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Qutini o'chirasizmi?"
+        description="Bu amalni ortga qaytarib bo'lmaydi. Quti butunlay o'chiriladi."
+        confirmLabel="O'chirish"
+        onConfirm={handleDeleteBox}
+        onCancel={() => setConfirmDelete(false)}
+        loading={deleting}
+      />
     </div>
   );
 }
@@ -353,16 +383,72 @@ function BoxCard({ box, onClick }: { box: Box; onClick: () => void }) {
   );
 }
 
-function BoxDetailContent({ box, onClose, onSetEmpty }: { box: Box; onClose: () => void; onSetEmpty: () => void }) {
+function BoxDetailContent({ box, onClose, onSetEmpty, onLongPressIcon }: {
+  box: Box;
+  onClose: () => void;
+  onSetEmpty: () => void;
+  onLongPressIcon: () => void;
+}) {
   const routeUrl = mapsUrl(box.location);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const holdInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startLongPress = () => {
+    setHoldProgress(0);
+    const start = Date.now();
+    holdInterval.current = setInterval(() => {
+      const elapsed = Date.now() - start;
+      setHoldProgress(Math.min(elapsed / 5000, 1));
+    }, 50);
+    longPressTimer.current = setTimeout(() => {
+      clearInterval(holdInterval.current!);
+      setHoldProgress(0);
+      onLongPressIcon();
+    }, 5000);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    if (holdInterval.current) clearInterval(holdInterval.current);
+    longPressTimer.current = null;
+    holdInterval.current = null;
+    setHoldProgress(0);
+  };
+
+  const RADIUS = 20;
+  const CIRC = 2 * Math.PI * RADIUS;
 
   return (
     <div className="px-5 pb-8">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <button
+          className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 relative select-none"
+          onMouseDown={startLongPress}
+          onMouseUp={cancelLongPress}
+          onMouseLeave={cancelLongPress}
+          onTouchStart={(e) => { e.preventDefault(); startLongPress(); }}
+          onTouchEnd={cancelLongPress}
+          onTouchCancel={cancelLongPress}
+          onContextMenu={(e) => e.preventDefault()}
+        >
           <Package size={22} className="text-primary" strokeWidth={1.8} />
-        </div>
+          {holdProgress > 0 && (
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 48 48">
+              <circle
+                cx="24" cy="24" r={RADIUS}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                className="text-primary"
+                strokeDasharray={CIRC}
+                strokeDashoffset={CIRC * (1 - holdProgress)}
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+        </button>
         <div className="flex-1">
           <h2 className="text-lg font-bold">Exson qutisi {box.number}</h2>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full inline-block mt-0.5 ${

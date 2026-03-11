@@ -11,6 +11,13 @@ async function throwError(res: Response, fallback: string): Promise<never> {
   throw new Error(fallback);
 }
 
+async function safeFetch(...args: Parameters<typeof fetch>): Promise<Response> {
+  return fetch(...args).catch((err) => {
+    if (err instanceof TypeError) throw new Error("Internet aloqasi yo'q");
+    throw err;
+  });
+}
+
 function authHeaders(): Record<string, string> {
   const apiKey = useAuthStore.getState().apiKey;
   if (!apiKey) return {};
@@ -18,7 +25,7 @@ function authHeaders(): Record<string, string> {
 }
 
 export async function verifyPin(pin: string): Promise<VerifyResponse> {
-  const res = await fetch(`${BASE_URL}/verify`, {
+  const res = await safeFetch(`${BASE_URL}/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: `pin=${encodeURIComponent(pin)}`,
@@ -28,7 +35,7 @@ export async function verifyPin(pin: string): Promise<VerifyResponse> {
 }
 
 export async function fetchBoxes(): Promise<Box[]> {
-  const res = await fetch(`${BASE_URL}/list`);
+  const res = await safeFetch(`${BASE_URL}/list`);
   if (!res.ok) await throwError(res, "Ro'yxatni yuklashda xato");
   const data = await res.json();
   return data.items ?? [];
@@ -37,7 +44,7 @@ export async function fetchBoxes(): Promise<Box[]> {
 export async function uploadImage(file: File): Promise<BoxImage[]> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE_URL}/upload`, {
+  const res = await safeFetch(`${BASE_URL}/upload`, {
     method: "POST",
     headers: authHeaders(),
     body: formData,
@@ -52,7 +59,7 @@ export async function createBox(data: {
   location: string;
   images: BoxImage[];
 }): Promise<Box> {
-  const res = await fetch(`${BASE_URL}/create`, {
+  const res = await safeFetch(`${BASE_URL}/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(data),
@@ -62,14 +69,14 @@ export async function createBox(data: {
 }
 
 export async function setBoxEmpty(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/set-empty?id=${id}`, {
+  const res = await safeFetch(`${BASE_URL}/set-empty?id=${id}`, {
     headers: authHeaders(),
   });
   if (!res.ok) await throwError(res, "Statusni o'zgartirishda xato");
 }
 
 export async function removeBox(id: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/remove?id=${id}`, {
+  const res = await safeFetch(`${BASE_URL}/remove?id=${id}`, {
     headers: authHeaders(),
   });
   if (!res.ok) await throwError(res, "Qutini o'chirishda xato");

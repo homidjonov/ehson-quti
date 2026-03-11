@@ -12,7 +12,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Ha, bo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+    <div className="fixed inset-0 flex items-center justify-center px-6" style={{ zIndex: 3000 }}>
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
       <div className="relative z-10 bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
         <h3 className="text-lg font-bold text-center mb-2">{title}</h3>

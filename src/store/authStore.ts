@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 const LOCK_AFTER_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -30,6 +30,6 @@ export const useAuthStore = create<AuthState>()(
 
       resetTimer: () => set({ lockedAt: Date.now() }),
     }),
-    { name: "quti-auth" }
+    { name: "quti-auth", storage: createJSONStorage(() => sessionStorage) }
   )
 );
