@@ -21,7 +21,7 @@ export function BottomSheet({ open, onClose, children }: Props) {
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-gray-200" />
         </div>
-        <div className="flex-1 overflow-y-auto pb-safe">
+        <div className="flex-1 overflow-y-auto">
           {children}
         </div>
       </div>

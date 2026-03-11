@@ -31,7 +31,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-gray-200 flex items-start justify-center">
-        <div className="relative w-full max-w-sm md:max-w-md min-h-screen bg-background shadow-2xl overflow-hidden">
+        <div className="relative w-full max-w-sm md:max-w-md bg-background shadow-2xl overflow-hidden" style={{ minHeight: "100dvh" }}>
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>

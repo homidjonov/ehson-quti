@@ -420,7 +420,7 @@ function BoxDetailContent({ box, onClose, onSetEmpty, onLongPressIcon }: {
   const CIRC = 2 * Math.PI * RADIUS;
 
   return (
-    <div className="px-5 pb-10" style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom) + 1.5rem)" }}>
+    <div className="px-5" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 24px) + 2rem)" }}>
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <button
