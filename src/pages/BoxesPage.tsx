@@ -560,7 +560,7 @@ function Lightbox({ thumbnails, index, onChange, onClose }: {
 
   return (
     <div
-      className="fixed inset-0 bg-black flex items-center justify-center"
+      className="absolute inset-0 bg-black flex items-center justify-center"
       style={{ zIndex: 9999 }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}

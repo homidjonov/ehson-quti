@@ -30,10 +30,14 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-      <Toaster position="top-center" richColors />
+      <div className="min-h-screen bg-gray-200 flex items-start justify-center">
+        <div className="relative w-full max-w-sm md:max-w-md min-h-screen bg-background shadow-2xl overflow-hidden">
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+          <Toaster position="top-center" richColors />
+        </div>
+      </div>
     </QueryClientProvider>
   );
 }
