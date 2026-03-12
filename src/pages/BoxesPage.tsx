@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBoxes, setBoxEmpty, removeBox, createBox, uploadImage } from "../api/client";
 import { BoxesMap, SingleBoxMap, LocationPickerMap } from "../components/MapView";
@@ -10,12 +10,26 @@ import { useAuthStore } from "../store/authStore";
 import { parseLocation, mapsUrl } from "../lib/utils";
 import { toast } from "sonner";
 
+type FilterType = "all" | "empty" | "full" | "nearest";
+
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function BoxesPage() {
   const lock = useAuthStore((s) => s.lock);
   const resetTimer = useAuthStore((s) => s.resetTimer);
   const queryClient = useQueryClient();
 
   const [tab, setTab] = useState<"list" | "map">("list");
+  const [filter, setFilter] = useState<FilterType>("all");
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedBox, setSelectedBox] = useState<Box | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -145,6 +159,34 @@ export default function BoxesPage() {
     setAddPreviews([]);
   };
 
+  const filteredBoxes = useMemo(() => {
+    if (filter === "empty") return boxes.filter((b) => b.is_empty);
+    if (filter === "full") return boxes.filter((b) => !b.is_empty);
+    if (filter === "nearest" && userLocation) {
+      return [...boxes].sort((a, b) => {
+        const locA = parseLocation(a.location);
+        const locB = parseLocation(b.location);
+        if (!locA && !locB) return 0;
+        if (!locA) return 1;
+        if (!locB) return -1;
+        const distA = getDistance(userLocation[0], userLocation[1], locA[0], locA[1]);
+        const distB = getDistance(userLocation[0], userLocation[1], locB[0], locB[1]);
+        return distA - distB;
+      });
+    }
+    return boxes;
+  }, [boxes, filter, userLocation]);
+
+  const handleFilterChange = (f: FilterType) => {
+    setFilter(f);
+    if (f === "nearest" && !userLocation) {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+        () => toast.error("Joylashuvni aniqlab bo'lmadi")
+      );
+    }
+  };
+
   const allCoords = boxes.map((b) => parseLocation(b.location)).filter(Boolean) as [number, number][];
   const mapCenter: [number, number] | undefined = allCoords.length
     ? [
@@ -162,6 +204,30 @@ export default function BoxesPage() {
           <LogOut size={22} />
         </button>
       </div>
+
+      {/* Filter */}
+      {tab === "list" && !isLoading && !error && boxes.length > 0 && (
+        <div className="flex gap-2 px-4 pb-2 overflow-x-auto flex-shrink-0">
+          {([
+            ["all", "Barchasi"],
+            ["empty", "Bo'shlari"],
+            ["full", "To'lalari"],
+            ["nearest", "Yaqinlari"],
+          ] as [FilterType, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => handleFilterChange(key)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                filter === key
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 relative min-h-0">
@@ -183,7 +249,13 @@ export default function BoxesPage() {
                 <p>Qutilar yo'q</p>
               </div>
             )}
-            {boxes.map((box) => (
+            {filteredBoxes.length === 0 && boxes.length > 0 && (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+                <Package size={48} strokeWidth={1} />
+                <p>Natija topilmadi</p>
+              </div>
+            )}
+            {filteredBoxes.map((box) => (
               <BoxCard key={box.id} box={box} onClick={() => handleSelectBox(box)} />
             ))}
           </div>
