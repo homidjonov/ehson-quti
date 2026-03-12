@@ -209,10 +209,10 @@ export default function BoxesPage() {
       {tab === "list" && !isLoading && !error && boxes.length > 0 && (
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto flex-shrink-0">
           {([
-            ["all", "Barchasi"],
-            ["empty", "Bo'shlari"],
-            ["full", "To'lalari"],
-            ["nearest", "Yaqinlari"],
+            ["all", "Barcha"],
+            ["empty", "Bo'sh"],
+            ["full", "To'la"],
+            ["nearest", "Yaqin"],
           ] as [FilterType, string][]).map(([key, label]) => (
             <button
               key={key}
