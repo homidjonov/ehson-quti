@@ -5,7 +5,7 @@ import { BoxesMap, SingleBoxMap, LocationPickerMap } from "../components/MapView
 import { BottomSheet } from "../components/BottomSheet";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import type { Box, BoxImage, BoxThumbnail } from "../types";
-import { Package, LogOut, Plus, MapPin, Navigation, Camera, X, List, Map as MapIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Package, LogOut, Plus, MapPin, Navigation, Camera, X, List, Map as MapIcon, ChevronLeft, ChevronRight, Crosshair } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { parseLocation, mapsUrl } from "../lib/utils";
 import { toast } from "sonner";
@@ -41,17 +41,50 @@ export default function BoxesPage() {
   // Add box form state
   const [addNumber, setAddNumber] = useState("");
   const [addLocation, setAddLocation] = useState<[number, number] | null>(null);
+  const [addLatlngInput, setAddLatlngInput] = useState("");
+  const [addLatlngError, setAddLatlngError] = useState("");
   const [addImages, setAddImages] = useState<BoxImage[]>([]);
   const [addPreviews, setAddPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const applyAddLocation = (lat: number, lng: number) => {
+    const rlat = parseFloat(lat.toFixed(7));
+    const rlng = parseFloat(lng.toFixed(7));
+    setAddLocation([rlat, rlng]);
+    setAddLatlngInput(`${rlat}, ${rlng}`);
+    setAddLatlngError("");
+  };
+
+  const parseLatlng = (val: string): [number, number] | null => {
+    const m = val.trim().match(/^(-?\d+(?:[.,]\d+)?)[,;\s]+(-?\d+(?:[.,]\d+)?)$/);
+    if (!m) return null;
+    const lat = parseFloat(m[1].replace(",", "."));
+    const lng = parseFloat(m[2].replace(",", "."));
+    if (isNaN(lat) || isNaN(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return [lat, lng];
+  };
+
+  const handleLatlngInput = (val: string) => {
+    setAddLatlngInput(val);
+    if (!val.trim()) { setAddLatlngError(""); return; }
+    const parsed = parseLatlng(val);
+    if (parsed) {
+      setAddLocation(parsed);
+      setAddLatlngError("");
+    } else {
+      setAddLatlngError("Format: 41.299500, 69.240100");
+    }
+  };
 
   useEffect(() => {
     if (!showAdd || addLocation) return;
     navigator.geolocation?.getCurrentPosition(
-      (pos) => setAddLocation([pos.coords.latitude, pos.coords.longitude]),
-      () => {} // silent fail — user can tap manually
+      (pos) => applyAddLocation(pos.coords.latitude, pos.coords.longitude),
+      () => {}
     );
   }, [showAdd]);
 
@@ -121,12 +154,16 @@ export default function BoxesPage() {
       toast.error("Joylashuv aniqlash qo'llab-quvvatlanmaydi");
       return;
     }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setAddLocation([pos.coords.latitude, pos.coords.longitude]);
-        toast.success("Joylashuv aniqlandi");
+        applyAddLocation(pos.coords.latitude, pos.coords.longitude);
+        setLocating(false);
       },
-      () => toast.error("Joylashuvni aniqlab bo'lmadi")
+      () => {
+        toast.error("Joylashuvni aniqlab bo'lmadi");
+        setLocating(false);
+      }
     );
   };
 
@@ -155,6 +192,8 @@ export default function BoxesPage() {
     setShowAdd(false);
     setAddNumber("");
     setAddLocation(null);
+    setAddLatlngInput("");
+    setAddLatlngError("");
     setAddImages([]);
     setAddPreviews([]);
   };
@@ -198,7 +237,7 @@ export default function BoxesPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+      <div className="flex items-center justify-between px-5 pb-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 20px) + 12px)" }}>
         <h1 className="text-xl font-bold text-foreground">Exson qutilar</h1>
         <button onClick={lock} className="p-2 text-destructive active:scale-95 transition-transform">
           <LogOut size={22} />
@@ -261,8 +300,20 @@ export default function BoxesPage() {
           </div>
         )}
         {!isLoading && !error && tab === "map" && (
-          <div className="h-full">
+          <div className="h-full relative">
             <BoxesMap boxes={boxes} onSelect={handleSelectBox} userLocation={userLocation} fallbackCenter={mapCenter} />
+            <button
+              onClick={() => {
+                navigator.geolocation?.getCurrentPosition(
+                  (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+                  () => toast.error("Joylashuvni aniqlab bo'lmadi")
+                );
+              }}
+              className="absolute bottom-5 right-4 w-12 h-12 rounded-full bg-white dark:bg-zinc-900 border border-border shadow-lg flex items-center justify-center text-primary"
+              style={{ zIndex: 1000 }}
+            >
+              <Crosshair size={20} />
+            </button>
           </div>
         )}
       </div>
@@ -335,22 +386,40 @@ export default function BoxesPage() {
             className="w-full h-12 px-4 rounded-2xl border border-border bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary mb-4"
           />
 
+          {/* Lat,Lng input + crosshair button */}
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={addLatlngInput}
+              onChange={(e) => handleLatlngInput(e.target.value)}
+              placeholder="41.299500, 69.240100"
+              className="flex-1 h-11 px-3 rounded-2xl border border-border bg-muted text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="button"
+              onClick={handleUseCurrentLocation}
+              disabled={locating}
+              className="w-11 h-11 rounded-2xl border border-border bg-muted flex items-center justify-center text-primary disabled:opacity-50 shrink-0"
+            >
+              {locating ? (
+                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Crosshair size={18} />
+              )}
+            </button>
+          </div>
+          {addLatlngError && (
+            <p className="text-xs text-destructive mb-2">{addLatlngError}</p>
+          )}
+
           {/* Map picker */}
-          <div className="h-52 rounded-2xl overflow-hidden border border-border mb-3">
+          <div className="h-52 rounded-2xl overflow-hidden border border-border mb-4">
             <LocationPickerMap
               location={addLocation}
-              onLocationChange={(lat, lng) => setAddLocation([lat, lng])}
+              onLocationChange={(lat, lng) => applyAddLocation(lat, lng)}
             />
           </div>
-
-          {/* Current location */}
-          <button
-            onClick={handleUseCurrentLocation}
-            className="w-full h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center gap-2 text-sm font-medium mb-4 active:scale-95 transition-transform"
-          >
-            <MapPin size={16} />
-            Hozirgi joylashuvni aniqlash
-          </button>
 
           {/* Images */}
           <div className="flex gap-3 flex-wrap mb-5">

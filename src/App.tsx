@@ -4,6 +4,9 @@ import { Toaster } from "sonner";
 import { useAuthStore } from "./store/authStore";
 import PinPage from "./pages/PinPage";
 import BoxesPage from "./pages/BoxesPage";
+import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +31,14 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setOverlaysWebView({ overlay: false });
+      StatusBar.setBackgroundColor({ color: "#eff4f3" });
+      StatusBar.setStyle({ style: Style.Light });
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-gray-200 flex items-start justify-center">

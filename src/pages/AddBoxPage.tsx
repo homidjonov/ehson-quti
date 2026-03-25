@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,8 +7,9 @@ import { uploadImage, createBox } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Camera, X, MapPin } from "lucide-react";
+import { ArrowLeft, Camera, X, MapPin, Crosshair } from "lucide-react";
 import type { BoxImage } from "../types";
+import { LocationPickerMap } from "../components/MapView";
 
 const schema = z.object({
   number: z.coerce.number().int().positive("Raqam kiritish shart"),
@@ -17,6 +18,16 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema>;
+
+function parseLatLng(val: string): [number, number] | null {
+  const m = val.trim().match(/^(-?\d+(?:[.,]\d+)?)[,;\s]+(-?\d+(?:[.,]\d+)?)$/);
+  if (!m) return null;
+  const lat = parseFloat(m[1].replace(",", "."));
+  const lng = parseFloat(m[2].replace(",", "."));
+  if (isNaN(lat) || isNaN(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return [lat, lng];
+}
 
 export default function AddBoxPage() {
   const navigate = useNavigate();
@@ -28,6 +39,10 @@ export default function AddBoxPage() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [mapLocation, setMapLocation] = useState<[number, number] | null>(null);
+  const [latlngInput, setLatlngInput] = useState("");
+  const [latlngError, setLatlngError] = useState("");
+  const [locating, setLocating] = useState(false);
 
   const {
     register,
@@ -36,19 +51,71 @@ export default function AddBoxPage() {
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  const handleUseCurrentLocation = () => {
+  // On mount: get current location to center the map
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(7));
+        const lng = parseFloat(pos.coords.longitude.toFixed(7));
+        setMapLocation([lat, lng]);
+        setValue("lat", lat);
+        setValue("lng", lng);
+        setLatlngInput(`${lat}, ${lng}`);
+      },
+      () => {} // silent fail, map uses Tashkent default
+    );
+  }, []);
+
+  const goToCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error("Joylashuv aniqlash qo'llab-quvvatlanmaydi");
       return;
     }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setValue("lat", parseFloat(pos.coords.latitude.toFixed(7)));
-        setValue("lng", parseFloat(pos.coords.longitude.toFixed(7)));
-        toast.success("Joylashuv aniqlandi");
+        const lat = parseFloat(pos.coords.latitude.toFixed(7));
+        const lng = parseFloat(pos.coords.longitude.toFixed(7));
+        applyLocation(lat, lng);
+        setLocating(false);
       },
-      () => toast.error("Joylashuvni aniqlab bo'lmadi")
+      () => {
+        toast.error("Joylashuvni aniqlab bo'lmadi");
+        setLocating(false);
+      }
     );
+  };
+
+  const applyLocation = (lat: number, lng: number) => {
+    setMapLocation([lat, lng]);
+    setValue("lat", lat);
+    setValue("lng", lng);
+    setLatlngInput(`${lat}, ${lng}`);
+    setLatlngError("");
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    const rlat = parseFloat(lat.toFixed(7));
+    const rlng = parseFloat(lng.toFixed(7));
+    applyLocation(rlat, rlng);
+  };
+
+  const handleLatlngChange = (val: string) => {
+    setLatlngInput(val);
+    if (!val.trim()) {
+      setLatlngError("");
+      return;
+    }
+    const parsed = parseLatLng(val);
+    if (parsed) {
+      setValue("lat", parsed[0]);
+      setValue("lng", parsed[1]);
+      setMapLocation(parsed);
+      setLatlngError("");
+    } else {
+      setLatlngError("Format: 41.299500, 69.240100");
+    }
   };
 
   const handleFiles = async (files: FileList | null) => {
@@ -114,6 +181,7 @@ export default function AddBoxPage() {
           <input
             {...register("number")}
             type="number"
+            inputMode="numeric"
             placeholder="221211"
             className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           />
@@ -125,40 +193,46 @@ export default function AddBoxPage() {
         {/* Location */}
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Joylashuv</label>
-          <button
-            type="button"
-            onClick={handleUseCurrentLocation}
-            className="w-full h-12 rounded-xl border border-dashed border-primary text-primary flex items-center justify-center gap-2 text-sm font-medium hover:bg-primary/5"
-          >
-            <MapPin size={18} />
-            Joriy joylashuvni ishlatish
-          </button>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <input
-                {...register("lat")}
-                type="number"
-                step="any"
-                placeholder="Kenglik (lat)"
-                className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
-              {errors.lat && (
-                <p className="text-xs text-destructive mt-1">{errors.lat.message}</p>
+
+          {/* Lat,Lng input + location button */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={latlngInput}
+              onChange={(e) => handleLatlngChange(e.target.value)}
+              placeholder="41.299500, 69.240100"
+              className="flex-1 h-11 px-3 rounded-xl border border-border bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="button"
+              onClick={goToCurrentLocation}
+              disabled={locating}
+              className="w-11 h-11 rounded-xl border border-border bg-card flex items-center justify-center text-primary disabled:opacity-50 shrink-0"
+            >
+              {locating ? (
+                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Crosshair size={18} />
               )}
-            </div>
-            <div>
-              <input
-                {...register("lng")}
-                type="number"
-                step="any"
-                placeholder="Uzunlik (lng)"
-                className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-              />
-              {errors.lng && (
-                <p className="text-xs text-destructive mt-1">{errors.lng.message}</p>
-              )}
-            </div>
+            </button>
           </div>
+
+          {/* Map */}
+          <div className="h-56 rounded-2xl overflow-hidden border border-border">
+            <LocationPickerMap location={mapLocation} onLocationChange={handleMapClick} />
+          </div>
+
+          {latlngError && (
+            <p className="text-xs text-destructive">{latlngError}</p>
+          )}
+          {(errors.lat || errors.lng) && !latlngError && (
+            <p className="text-xs text-destructive">Koordinatani kiriting</p>
+          )}
+
+          {/* Hidden fields for form validation */}
+          <input type="hidden" {...register("lat")} />
+          <input type="hidden" {...register("lng")} />
         </div>
 
         {/* Images */}
