@@ -18,13 +18,16 @@ const SATELLITE_ATTR = "Tiles &copy; Esri";
 const COLOR_PRIMARY = "#2da882";
 const COLOR_EMPTY = "#94a3b8";
 
-function pinIcon(color: string) {
+function pinIcon(color: string, label?: number | string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 40" width="28" height="40">
     <path fill="${color}" stroke="white" stroke-width="1.5" d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.3 21.7 0 14 0z"/>
     <circle fill="white" cx="14" cy="14" r="5"/>
   </svg>`;
+  const labelHtml = label !== undefined && label !== null
+    ? `<div style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%) translateY(-2px);background:rgba(0,0,0,0.75);color:#fff;font-size:15px;font-weight:700;font-family:sans-serif;white-space:nowrap;padding:1px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.5);line-height:18px;">${label}</div>`
+    : "";
   return L.divIcon({
-    html: svg,
+    html: `<div style="position:relative;width:28px;height:40px;">${labelHtml}${svg}</div>`,
     className: "",
     iconSize: [28, 40],
     iconAnchor: [14, 40],
@@ -76,7 +79,7 @@ export function BoxesMap({ boxes, onSelect, userLocation, fallbackCenter }: Boxe
           <Marker
             key={box.id}
             position={coords}
-            icon={pinIcon(box.is_empty ? COLOR_EMPTY : COLOR_PRIMARY)}
+            icon={pinIcon(box.is_empty ? COLOR_EMPTY : COLOR_PRIMARY, box.number)}
             eventHandlers={{ click: () => onSelect(box) }}
           />
         );
